@@ -32,7 +32,8 @@ def main(app_name: str, in_dir: Path, out_dir: Path) -> None:
     if not out_dir.exists():
         msg.warn('  creating output directory')
         out_dir.mkdir(parents=True)
-    out_file: Path = out_dir / f'{app_name}-cm-sqls.yaml'
+    out_file: Path = out_dir / 'cm-sqls.yaml'
+    # out_file: Path = out_dir / f'{app_name}-cm-sqls.yaml'
     msg.info(f'  output yaml file = {out_file}')
 
     msg.info('searching SQL files...')

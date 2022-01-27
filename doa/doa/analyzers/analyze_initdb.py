@@ -51,7 +51,7 @@ def main(app_name: str, in_dir: Path, out_dir: Path, init_file: Path) -> None:
                     msg.info(f"  converted to: {parsed.to_statement()}")
                     g.write(parsed.to_statement()+"\n")
 
-        out_file = out_dir / f"{app_name}-cm-init-db.yaml"
+        out_file = out_dir / "cm-init-db.yaml"
         msg.info('generating manifest...')
         with open(out_file, mode='w', encoding='utf-8') as file:
             _args.extend(['--from-file', init_db_file])
