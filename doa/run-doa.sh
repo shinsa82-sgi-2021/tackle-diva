@@ -67,7 +67,7 @@ OUTDIR=$(abspath ${outdir})
 
 
 echo "--------------------"
-echo "DOA migrator wrapper"
+echo "DiVA-DOA wrapper"
 echo "--------------------"
 
 if [[ -n ${debug+x} ]]; then
@@ -89,7 +89,7 @@ fi
 #       does not have "-f" option, thus thus script provided abspath().
 #       if you can use "readlink -f", you can use it instead.
 echo
-echo "running container..."
+echo "running container ${IMAGE}..."
 docker run -it --rm \
     -u vscode \
     -v ${OUTDIR}:/out \
