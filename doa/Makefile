@@ -17,7 +17,7 @@ run:
 	bash $(base_dir)/run-doa.sh -d -o $(OUT_DIR) -i start_up.sh $(SAMPLE_REPO_URL)
 	@echo
 	@echo "listing generated files..."
-	ls -lFR --color $(OUT_DIR)
+	ls -lFR --color $(OUT_DIR)/trading-app
 
 run-direct:
 	rm -rf $(OUT_DIR)
@@ -25,7 +25,7 @@ run-direct:
 	bash $(base_dir)/doa/migrate.sh -o $(OUT_DIR) -i start_up.sh $(SAMPLE_REPO_URL)
 	@echo
 	@echo "listing generated files..."
-	ls -lFR --color $(OUT_DIR)
+	ls -lFR --color $(OUT_DIR)/trading-app
 
 # test for starting docker container
 docker:
