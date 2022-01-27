@@ -58,17 +58,25 @@ See [util/start-minikube.sh](util/start-minikube.sh) to (stop and) start a new m
 
 Let us demonstrate the toolchain to adapt a `trading-app` app by saud-aslam (https://github.com/saud-aslam/trading-app).
 
-## (0) Build `diva-migrator` docker image
+## (0) Build `diva-doa` docker image
 
-Need to run just once.
+Clone this repository and go to `doa` directory.
 
 ```bash
-$ make build
+$ cd /tmp
+$ git clone https://github.com/shinsa82-sgi-2021/tackle-diva.git
+$ cd tackle-diva/doa
+```
 
-$ docker images diva-doa
-REPOSITORY   TAG          IMAGE ID       CREATED        SIZE
-diva-doa     2.0.0.dev0   0ef5158f0c85   44 hours ago   1.21GB
-diva-doa     latest       0ef5158f0c85   44 hours ago   1.21GB
+Build an image, needed to run just once.
+
+```bash
+$ bash util/build.sh
+
+$ docker image ls diva-doa
+REPOSITORY   TAG       IMAGE ID       CREATED        SIZE
+diva-doa     2.0.0     5f9dd8f9f0eb   19 hours ago   1.27GB
+diva-doa     latest    5f9dd8f9f0eb   19 hours ago   1.27GB
 ```
 
 ## (1) Analyze target app and generate manifests
@@ -76,23 +84,22 @@ diva-doa     latest       0ef5158f0c85   44 hours ago   1.21GB
 To analyze `trading-app`, executing the wrapper script `run-doa.sh` with arguments:
 
 ```bash
-$ bash ./run-doa.sh -o _out -i start_up.sh https://github.com/saud-aslam/trading-app
+$ bash ./run-doa.sh -o /tmp/out -i start_up.sh https://github.com/saud-aslam/trading-app
 --------------------
-DOA migrator wrapper
+DiVA-DOA wrapper
 --------------------
 
-running container...
+running container diva-doa:latest...
 
-------------------
-DiVA migrator v1.0
-------------------
-
+------------------------
+DiVA-DOA v2.0.0
+------------------------
 ...
 
 [OK] successfully completed.
 ```
 
-This code analyzes an app at repository https://github.com/saud-aslam/trading-app and outputs generated files under `_out` directory. You can specify any directory that you like.
+This code analyzes an app at repository https://github.com/saud-aslam/trading-app and outputs generated files under `/tmp/out` directory. You can specify any directory that you like.
 
 In current version, you need to specify (by `-i` option) a file under the repository from which DB initializatoin code will be extracted. Currently only shell script file can be supported.
 
