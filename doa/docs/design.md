@@ -44,7 +44,7 @@ Legend:
 The figure below shows an architecture overview of DiVA-DOA.
 See [Main Logic](#main-logic) section below for (1) and (2) in the diagram.
 
-![Architecture overview](arch.dot.svg)
+![Architecture overview](arch-overview.dot.svg)
 
 ## Overall
 
