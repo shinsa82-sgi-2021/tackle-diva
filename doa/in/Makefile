@@ -12,6 +12,7 @@ SAMPLE_REPO_URL=https://github.com/saud-aslam/trading-app
 SAMPLE_DIR=$(base_dir)/plsql-example
 
 OUT_DIR=/tmp/out
+STAT_DIR=/tmp/stats
 
 # executing run-doa.sh with a debug flag
 run:
@@ -45,6 +46,14 @@ run-plsql-direct:
 	@echo "listing generated files..."
 	ls -lFR --color $(OUT_DIR)
 
+run-sqal-direct:
+	rm -rf $(OUT_DIR) $(STAT_DIR)
+	python -m sqal.doa -n foo-app -i $(SAMPLE_DIR) -o $(OUT_DIR) --stat-dir $(STAT_DIR) --use-debug-listener
+	@echo
+	@echo "listing generated files..."
+	ls -lFR --color $(OUT_DIR)
+	ls -lFR --color $(STAT_DIR)
+
 # test for starting docker container
 docker:
 	-rm -rf ./_out
@@ -76,3 +85,8 @@ build:
 	docker image ls $(IMAGE_NAME)
 	@echo
 	@echo "build completed."
+
+# clean cache files
+clean:
+	find $(base_dir) -name __pycache__ | xargs rm -rf 
+	find $(base_dir) -name .pytest_cache | xargs rm -rf 
