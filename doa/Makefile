@@ -1,7 +1,7 @@
 base_dir=$(abspath $(dir $(lastword $(MAKEFILE_LIST))))
 
 IMAGE_NAME=diva-doa
-IMAGE_VER=2.2.0rc0
+IMAGE_VER=2.2.0rc1
 RUN_IMAGE=$(IMAGE_NAME):latest
 DOCKERFILE=$(base_dir)/.devcontainer/Dockerfile
 DOCKER_CONTEXT=$(base_dir)/doa

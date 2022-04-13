@@ -6,11 +6,11 @@ from glob import iglob
 from pathlib import Path
 from subprocess import CompletedProcess, run
 
+from sqal.doa import main as convert
 from typer import Abort, Option, Typer
 from wasabi import Printer
 
 from . import __version__
-from .converter.doa import main as convert
 
 app = Typer()
 msg = Printer()
