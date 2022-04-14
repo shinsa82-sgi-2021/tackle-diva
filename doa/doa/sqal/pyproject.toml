@@ -1,7 +1,7 @@
 [tool.poetry]
 name = "sqal"
 version = "2.2.0-rc.1"
-description = "An SQL analyzer (SQl AnaLyzer) for assessment and migration to PostgreSQL."
+description = "SQAL: SQL Analyzer Libraray for Assessment and Migration to PostgreSQL"
 authors = ["Shin Saito <shinsa@jp.ibm.com>"]
 license = "Apache-2.0"
 
