@@ -17,7 +17,7 @@ from rich.logging import RichHandler
 from typer import Option, Typer
 
 from . import __version__
-from .analyzer import DebugListener, MyVisitor
+from .analyzer import PLSQLAnalyzer, MyVisitor
 from .parser import main as _parse
 from .preprocess import preprocess_file
 
@@ -31,7 +31,7 @@ app = Typer()
 IGNORE_PHYSPROP = True
 
 
-def stats(obj: DebugListener):
+def stats(obj: PLSQLAnalyzer):
     "get stats from Listener object."
     if IGNORE_PHYSPROP:
         s = {
@@ -46,6 +46,7 @@ def stats(obj: DebugListener):
             "has_alter_table_modify": obj.has_alter_table_modify,
             "has_global_temp_table": obj.has_global_temp_table,
             "has_varchar2": obj.has_varchar2,
+            "has_non_std_type": obj.has_non_std_type,
 
             # unsafe dialects
             "has_bitmap": obj.has_bitmap,
@@ -64,6 +65,7 @@ def stats(obj: DebugListener):
             "has_alter_table_modify": obj.has_alter_table_modify,
             "has_global_temp_table": obj.has_global_temp_table,
             "has_varchar2": obj.has_varchar2,
+            "has_non_std_type": obj.has_non_std_type,
 
             # unsafe dialects
             "has_bitmap": obj.has_bitmap,
@@ -84,6 +86,8 @@ def process_file(args):
     msg.debug(f'  path = {in_dir / file_path}')
     msg.debug(f'  preprocess = {preprocess}')
 
+    show_tree = False
+
     if preprocess:
         with TemporaryDirectory() as tempdir:
             msg.debug(tempdir)
@@ -94,8 +98,10 @@ def process_file(args):
         tree, parser = _parse(in_dir/file_path, silent=True, to_console=True)
     ist = parser.getTokenStream()
 
-    msg.debug(tree.toStringTree(recog=parser))
-    msg.debug(tree.getText())
+    if show_tree:
+        msg.debug(tree.toStringTree(recog=parser))
+    # msg.debug(tree.getText())
+
     # tree.start
     # tree.stop
     # (s, e) = tree.getSourceInterval()
@@ -103,7 +109,7 @@ def process_file(args):
 
     if use_debug_listener:
         walker = ParseTreeWalker()
-        collector = DebugListener(parser, ist, ignore_physprop=IGNORE_PHYSPROP)
+        collector = PLSQLAnalyzer(parser, ist, ignore_physprop=IGNORE_PHYSPROP)
         msg.debug("walking parse tree...")
         walker.walk(collector, tree)
         msg.debug("successfully walked.")
@@ -117,7 +123,7 @@ def process_file(args):
     msg.debug(ist.getText(tree.start, tree.stop))
 
     if use_debug_listener:
-        msg.info("analysis status:")
+        msg.info("analysis result of %s", in_dir / file_path)
         status = stats(collector)
         msg.info(status)
 
@@ -230,14 +236,16 @@ def main(app_name: str, in_dir: Path, out_dir: Path, stat_dir: Path,
         rprint(
             f"Number of SQLs (Generic): {stats_['has_not_dialect']} ({stats_['has_not_dialect']/stats_['num_files']:.1%})")
 
-        rprint()
-        rprint(
-            f"Number of SQLs automatically translated for Postgres: {stats_['has_only_safe_dialect']} ({stats_['has_only_safe_dialect']/stats_['has_dialect']:.1%})")
-        num_manual_fix = stats_['has_dialect']-stats_['has_only_safe_dialect']
-        rprint(
-            f"Number of SQLs requires manual revisions: {num_manual_fix} ({num_manual_fix/stats_['has_dialect']:.1%})")
-        rprint(indent(f"Local Index: {stats_['has_local_index']}", "  "))
-        rprint(indent(f"Bitmap Index: {stats_['has_bitmap']}", "  "))
+        if stats_['has_dialect'] > 0:
+            rprint()
+            rprint(
+                f"Number of SQLs automatically translated for Postgres: {stats_['has_only_safe_dialect']} ({stats_['has_only_safe_dialect']/stats_['has_dialect']:.1%})")
+            num_manual_fix = stats_['has_dialect'] - \
+                stats_['has_only_safe_dialect']
+            rprint(
+                f"Number of SQLs requires manual revisions: {num_manual_fix} ({num_manual_fix/stats_['has_dialect']:.1%})")
+            rprint(indent(f"Local Index: {stats_['has_local_index']}", "  "))
+            rprint(indent(f"Bitmap Index: {stats_['has_bitmap']}", "  "))
 
         with open(stat_dir/"stats.json", mode="w", encoding="utf-8") as f:
             # some cases, this program cannot write other than out_dir.
@@ -246,6 +254,7 @@ def main(app_name: str, in_dir: Path, out_dir: Path, stat_dir: Path,
             rprint(f"stats file {stat_dir/'stats.json'} is generated.")
         msg.info("cleaning up process pool...")
     msg.info("all OK.")
+
 
 @ app.command()
 def cli_main(

@@ -19,11 +19,12 @@ app = Typer()
 _logger = getLogger(__name__)
 
 
-class DebugListener(PlSqlParserListener):
+class PLSQLAnalyzer(PlSqlParserListener):
     "Listener class useful for debugging."
 
-    def __init__(self, parser, input_stream, ignore_physprop=True, verbose=False):
+    def __init__(self, parser, input_stream, remove_physprop=True, ignore_physprop=True, verbose=False):
         super()
+        self.remove_physprop = remove_physprop
         self.ignore_physprop = ignore_physprop
 
         self.parser = parser
@@ -38,15 +39,24 @@ class DebugListener(PlSqlParserListener):
         self.has_bitmap = False
         self.has_varchar2 = False
         self.has_local_index = False
+        self.has_non_std_type = False
 
-    def show(self, rule, ctx):
+        # used to keep state during traversal
+        self.modifiers = None
+
+    def show(self, rule, ctx, show_tree=True):
         "utility: dump context info for rules."
         _logger.debug('"' + rule + '"')
-        _logger.debug(f"tree: {ctx.toStringTree(recog=self.parser)}")
+        if show_tree:
+            _logger.debug(f"tree: {ctx.toStringTree(recog=self.parser)}")
+
+    def text(self, ctx):
+        "get text of a context including tokens in other channels"
+        return self.token_stream.getText(ctx.start, ctx.stop)
 
     # Exit a parse tree produced by PlSqlParser#sql_script.
     def exitSql_script(self, ctx: PlSqlParser.Sql_scriptContext):
-        self.show("sql_script", ctx)
+        self.show("sql_script", ctx, show_tree=False)
         x = self.token_stream.getTokens(
             ctx.start.tokenIndex, ctx.stop.tokenIndex+1, [PlSqlLexer.SOLIDUS])
         if ilen(x) > 0:
@@ -71,11 +81,14 @@ class DebugListener(PlSqlParserListener):
 
     # Exit a parse tree produced by PlSqlParser#unit_statement.
     def exitUnit_statement(self, ctx: PlSqlParser.Unit_statementContext):
-        self.show("unit_statement", ctx)
+        self.show("unit_statement", ctx, show_tree=False)
 
     # Exit a parse tree produced by PlSqlParser#sql_plus_command.
     def exitSql_plus_command(self, ctx: PlSqlParser.Sql_plus_commandContext):
         self.show("sql_plus_command", ctx)
+        if (x := ctx.SOLIDUS()):
+            _logger.warning("removing redundant '/'...")
+            x.getSymbol().text = ""
 
     # Exit a parse tree produced by PlSqlParser#physical_properties.
     def exitPhysical_properties(self, ctx: PlSqlParser.Physical_propertiesContext):
@@ -83,6 +96,23 @@ class DebugListener(PlSqlParserListener):
         if not self.ignore_physprop:
             self.has_physical_properties = True
             self.has_dialect = True
+        if self.remove_physprop:
+            _logger.warning("removing physical_properties...")
+            for token in self.token_stream.getTokens(ctx.start.tokenIndex, ctx.stop.tokenIndex+1):
+                token.text = ""
+
+    # Exit a parse tree produced by PlSqlParser#native_datatype_element.
+    def exitNative_datatype_element(self, ctx: PlSqlParser.Native_datatype_elementContext):
+        self.show("native_datatype_element", ctx)
+        if (x := ctx.NUMBER()):
+            self.has_dialect = True
+            self.has_non_std_type = True
+            _logger.info("replacing 'NUMBER' with 'DECIMAL'...")
+            x.getSymbol().text = "DECIMAL"
+
+    # Exit a parse tree produced by PlSqlParser#column_definition.
+    def exitColumn_definition(self, ctx: PlSqlParser.Column_definitionContext):
+        self.show("column_definition", ctx)
 
     # Exit a parse tree produced by PlSqlParser#create_table.
     def exitCreate_table(self, ctx: PlSqlParser.Create_tableContext):
@@ -90,24 +120,104 @@ class DebugListener(PlSqlParserListener):
         if ctx.GLOBAL():
             self.has_dialect = True
             self.has_global_temp_table = True
+        if (x := ctx.SOLIDUS()):
+            _logger.warning("replacing '/' with ';'...")
+            x.getSymbol().text = ";"
+
+    # Enter a parse tree produced by PlSqlParser#using_index_clause.
+    # def enterUsing_index_clause(self, ctx: PlSqlParser.Using_index_clauseContext):
+    #     self.show("[enter] using_index_clause", ctx)
+    #     _logger.debug(ctx.index_properties())
+    #     _logger.debug(ctx.create_index())
+    #     _logger.debug(ctx.index_name())
+
+    # Exit a parse tree produced by PlSqlParser#using_index_clause.
+    def exitUsing_index_clause(self, ctx: PlSqlParser.Using_index_clauseContext):
+        self.show("using_index_clause", ctx)
+        if ctx.index_properties() and self.remove_physprop:
+            _logger.warning("removing using_index...")
+            for token in self.token_stream.getTokens(ctx.start.tokenIndex, ctx.stop.tokenIndex+1):
+                token.text = ""
+
+    # # Enter a parse tree produced by PlSqlParser#modify_column_clauses.
+    # def enterModify_column_clauses(self, ctx: PlSqlParser.Modify_column_clausesContext):
+    #     self.show("[E] modify_column_clauses", ctx, show_tree=False)
+
+    # Exit a parse tree produced by PlSqlParser#modify_col_properties.
+    def exitModify_col_properties(self, ctx: PlSqlParser.Modify_col_propertiesContext):
+        self.show("modify_col_properties", ctx)
+        # _logger.debug(ctx.column_name().getText())
+        # _logger.debug(ctx.datatype().getText())
+        # _logger.debug(self.text(ctx))
+        self.modifiers.append(
+            (self.text(ctx.column_name()), self.text(ctx.datatype()))
+        )
+    # Exit a parse tree produced by PlSqlParser#modify_column_clauses.
+
+    def exitModify_column_clauses(self, ctx: PlSqlParser.Modify_column_clausesContext):
+        self.show("modify_column_clauses", ctx)
+        self.has_dialect = True
+        self.has_alter_table_modify = True
+        # _logger.debug(self.modifiers)
+
+    # Enter a parse tree produced by PlSqlParser#alter_table.
+    def enterAlter_table(self, ctx: PlSqlParser.Alter_tableContext):
+        self.show("[E] alter_table", ctx)
+        self.modifiers = []
 
     # Exit a parse tree produced by PlSqlParser#alter_table.
     def exitAlter_table(self, ctx: PlSqlParser.Alter_tableContext):
         self.show("alter_table", ctx)
-        x = self.token_stream.getTokens(
-            ctx.start.tokenIndex, ctx.stop.tokenIndex+1, [PlSqlLexer.MODIFY])
-        if ilen(x) > 0:
-            self.has_dialect = True
-            self.has_alter_table_modify = True
+        # x = self.token_stream.getTokens(
+        #     ctx.start.tokenIndex, ctx.stop.tokenIndex+1, [PlSqlLexer.MODIFY])
+        # if ilen(x) > 0:
+        #     self.has_dialect = True
+        #     self.has_alter_table_modify = True
+        if self.modifiers:
+            _logger.warning("rewriting ALTER TABLE MODIFY statement...")
+            _logger.debug("modifiers: %s", self.modifiers)
+            _logger.debug(self.text(ctx.tableview_name()))
+            t = ", ".join(f"ALTER COLUMN {col} TYPE {typ}" for (
+                col, typ) in self.modifiers)
+            replacement = f"ALTER TABLE {self.text(ctx.tableview_name())} {t};"
+            _logger.debug(replacement)
 
-    # Enter a parse tree produced by PlSqlParser#create_index.
-    def enterCreate_index(self, ctx: PlSqlParser.Create_indexContext):
-        self.show("alter_table", ctx)
+            for token in self.token_stream.getTokens(ctx.start.tokenIndex, ctx.stop.tokenIndex+1):
+                if token.tokenIndex == ctx.start.tokenIndex:
+                    token.text = replacement
+                else:
+                    token.text = ""
+        elif (x := ctx.SOLIDUS()):
+            _logger.warning("replacing '/' with ';'...")
+            x.getSymbol().text = ";"
+
+    # Exit a parse tree produced by PlSqlParser#physical_attributes_clause.
+    def exitPhysical_attributes_clause(self, ctx: PlSqlParser.Physical_attributes_clauseContext):
+        self.show("physical_attributes_clause", ctx)
+
+    # Exit a parse tree produced by PlSqlParser#index_attributes.
+    def exitIndex_attributes(self, ctx: PlSqlParser.Index_attributesContext):
+        self.show("index_attributes", ctx)
+
+    # Exit a parse tree produced by PlSqlParser#index_properties.
+    def exitIndex_properties(self, ctx: PlSqlParser.Index_propertiesContext):
+        self.show("index_properties", ctx)
+        if self.remove_physprop:
+            _logger.warning("removing index_properties...")
+            for token in self.token_stream.getTokens(ctx.start.tokenIndex, ctx.stop.tokenIndex+1):
+                token.text = ""
+
+    # Exit a parse tree produced by PlSqlParser#create_index.
+    def exitCreate_index(self, ctx: PlSqlParser.Create_indexContext):
+        self.show("create_index", ctx)
         x = self.token_stream.getTokens(
             ctx.start.tokenIndex, ctx.stop.tokenIndex+1, [PlSqlLexer.LOCAL])
         if ilen(x) > 0:
             self.has_dialect = True
             self.has_local_index = True
+        if (x := ctx.SOLIDUS()):
+            _logger.warning("replacing '/' with ';'...")
+            x.getSymbol().text = ";"
 
 
 class MyVisitor(PlSqlParserVisitor):
