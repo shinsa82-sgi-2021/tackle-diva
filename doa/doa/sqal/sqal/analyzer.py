@@ -35,14 +35,17 @@ class PLSQLAnalyzer(PlSqlParserListener):
         self.solidus = False
         self.remark = False
         self.has_alter_table_modify = False
+        self.has_alter_table_add = False
         self.has_global_temp_table = False
         self.has_bitmap = False
         self.has_varchar2 = False
         self.has_local_index = False
         self.has_non_std_type = False
+        self.has_non_rsvd_keyword = False
 
         # used to keep state during traversal
         self.modifiers = None
+        self.additions = None
 
     def show(self, rule, ctx, show_tree=True):
         "utility: dump context info for rules."
@@ -107,12 +110,50 @@ class PLSQLAnalyzer(PlSqlParserListener):
         if (x := ctx.NUMBER()):
             self.has_dialect = True
             self.has_non_std_type = True
-            _logger.info("replacing 'NUMBER' with 'DECIMAL'...")
+            _logger.warning("replacing 'NUMBER' with 'DECIMAL'...")
             x.getSymbol().text = "DECIMAL"
+        elif (x := ctx.VARCHAR2()):
+            self.has_dialect = True
+            self.has_non_std_type = True
+            _logger.warning("replacing 'VARCHAR2' with 'VARCHAR'...")
+            x.getSymbol().text = "VARCHAR"
+        elif (x := ctx.BLOB()):
+            self.has_dialect = True
+            self.has_non_std_type = True
+            _logger.warning("replacing 'BLOB' with 'BYTEA'...")
+            x.getSymbol().text = "BYTEA"
+
+    # Exit a parse tree produced by PlSqlParser#non_reserved_keywords_pre12c.
+    def exitNon_reserved_keywords_pre12c(self, ctx: PlSqlParser.Non_reserved_keywords_pre12cContext):
+        self.show("non_reserved_keywords_pre12c", ctx)
+        if ctx.LIMIT():
+            self.has_dialect = True
+            self.has_non_rsvd_keyword = True
+            _logger.warning("quote keyword LIMIT...")
+            ctx.LIMIT().getSymbol().text = '"LIMIT"'
+
+    # Exit a parse tree produced by PlSqlParser#column_name.
+    def exitColumn_name(self, ctx: PlSqlParser.Column_nameContext):
+        self.show("column_name", ctx)
 
     # Exit a parse tree produced by PlSqlParser#column_definition.
     def exitColumn_definition(self, ctx: PlSqlParser.Column_definitionContext):
         self.show("column_definition", ctx)
+
+        # for alter table add
+        if self.additions is not None:
+            self.additions.append(
+                (self.text(ctx.column_name()), self.text(ctx.datatype()))
+            )
+
+
+    # Exit a parse tree produced by PlSqlParser#lob_storage_clause.
+    def exitLob_storage_clause(self, ctx: PlSqlParser.Lob_storage_clauseContext):
+        self.show("lob_storage_clause", ctx)
+        if self.remove_physprop:
+            _logger.warning("removing lob_storage_clause...")
+            for token in self.token_stream.getTokens(ctx.start.tokenIndex, ctx.stop.tokenIndex+1):
+                token.text = ""
 
     # Exit a parse tree produced by PlSqlParser#create_table.
     def exitCreate_table(self, ctx: PlSqlParser.Create_tableContext):
@@ -160,10 +201,17 @@ class PLSQLAnalyzer(PlSqlParserListener):
         self.has_alter_table_modify = True
         # _logger.debug(self.modifiers)
 
+    # Exit a parse tree produced by PlSqlParser#add_column_clause.
+    def exitAdd_column_clause(self, ctx: PlSqlParser.Add_column_clauseContext):
+        self.show("add_column_clause", ctx)
+        self.has_dialect = True
+        self.has_alter_table_add = True
+
     # Enter a parse tree produced by PlSqlParser#alter_table.
     def enterAlter_table(self, ctx: PlSqlParser.Alter_tableContext):
         self.show("[E] alter_table", ctx)
         self.modifiers = []
+        self.additions = []
 
     # Exit a parse tree produced by PlSqlParser#alter_table.
     def exitAlter_table(self, ctx: PlSqlParser.Alter_tableContext):
@@ -175,10 +223,23 @@ class PLSQLAnalyzer(PlSqlParserListener):
         #     self.has_alter_table_modify = True
         if self.modifiers:
             _logger.warning("rewriting ALTER TABLE MODIFY statement...")
-            _logger.debug("modifiers: %s", self.modifiers)
-            _logger.debug(self.text(ctx.tableview_name()))
+            # _logger.debug("modifiers: %s", self.modifiers)
+            # _logger.debug(self.text(ctx.tableview_name()))
             t = ", ".join(f"ALTER COLUMN {col} TYPE {typ}" for (
                 col, typ) in self.modifiers)
+            replacement = f"ALTER TABLE {self.text(ctx.tableview_name())} {t};"
+            _logger.debug(replacement)
+
+            for token in self.token_stream.getTokens(ctx.start.tokenIndex, ctx.stop.tokenIndex+1):
+                if token.tokenIndex == ctx.start.tokenIndex:
+                    token.text = replacement
+                else:
+                    token.text = ""
+        elif self.additions:
+            _logger.warning("rewriting ALTER TABLE ADD statement...")
+            # _logger.warning("(not implemented yet)")
+            t = ", ".join(f"ADD COLUMN {col} {typ}" for (
+                col, typ) in self.additions)
             replacement = f"ALTER TABLE {self.text(ctx.tableview_name())} {t};"
             _logger.debug(replacement)
 

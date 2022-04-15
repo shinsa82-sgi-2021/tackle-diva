@@ -47,6 +47,7 @@ def stats(obj: PLSQLAnalyzer):
             "has_global_temp_table": obj.has_global_temp_table,
             "has_varchar2": obj.has_varchar2,
             "has_non_std_type": obj.has_non_std_type,
+            "has_non_rsvd_keyword": obj.has_non_rsvd_keyword,
 
             # unsafe dialects
             "has_bitmap": obj.has_bitmap,
@@ -66,6 +67,7 @@ def stats(obj: PLSQLAnalyzer):
             "has_global_temp_table": obj.has_global_temp_table,
             "has_varchar2": obj.has_varchar2,
             "has_non_std_type": obj.has_non_std_type,
+            "has_non_rsvd_keyword": obj.has_non_rsvd_keyword,
 
             # unsafe dialects
             "has_bitmap": obj.has_bitmap,
@@ -135,7 +137,7 @@ def process_file(args):
         msg.info("writing to file...")
         with open(out_dir/file_path, "w", encoding="utf-8") as f:  # pylint: disable=invalid-name
             f.write(ist.getText(tree.start, tree.stop))
-        msg.info(f"successfully written to {out_dir/file_path}.")
+        msg.info(f"successfully written to %s.", out_dir/file_path)
         return (str(file_path), True, status)
     else:
         return (str(file_path), False, {})
@@ -201,7 +203,9 @@ def main(app_name: str, in_dir: Path, out_dir: Path, stat_dir: Path,
                 "has_global_temp_table": ilen(filter(lambda x: x[2]["has_global_temp_table"], res)),
                 "has_bitmap": ilen(filter(lambda x: x[2]["has_bitmap"], res)),
                 "has_varchar2": ilen(filter(lambda x: x[2]["has_varchar2"], res)),
-                "has_local_index": ilen(filter(lambda x: x[2]["has_local_index"], res))
+                "has_local_index": ilen(filter(lambda x: x[2]["has_local_index"], res)),
+                "has_non_std_type": ilen(filter(lambda x: x[2]["has_non_std_type"], res)),
+                "has_non_rsvd_keyword": ilen(filter(lambda x: x[2]["has_non_rsvd_keyword"], res))
             }
         else:
             stats_ = {
@@ -215,7 +219,9 @@ def main(app_name: str, in_dir: Path, out_dir: Path, stat_dir: Path,
                 "has_global_temp_table": ilen(filter(lambda x: x[2]["has_global_temp_table"], res)),
                 "has_bitmap": ilen(filter(lambda x: x[2]["has_bitmap"], res)),
                 "has_varchar2": ilen(filter(lambda x: x[2]["has_varchar2"], res)),
-                "has_local_index": ilen(filter(lambda x: x[2]["has_local_index"], res))
+                "has_local_index": ilen(filter(lambda x: x[2]["has_local_index"], res)),
+                "has_non_std_type": ilen(filter(lambda x: x[2]["has_non_std_type"], res)),
+                "has_non_rsvd_keyword": ilen(filter(lambda x: x[2]["has_non_rsvd_keyword"], res))
             }
         stats_["has_not_dialect"] = stats_["num_files"]-stats_["has_dialect"]
         # stats_['unsafe'] = stats_['num_files'] - stats_['safe']
@@ -256,7 +262,7 @@ def main(app_name: str, in_dir: Path, out_dir: Path, stat_dir: Path,
     msg.info("all OK.")
 
 
-@ app.command()
+@app.command()
 def cli_main(
     # repo_url: str = Argument(...,
     #                          help="repository URL of tatget application."),
@@ -300,16 +306,28 @@ def cli_main(
     preprocess: bool = Option(
         True,
         help="if true, preprocessing (encoding conversion to UTF-8, and uppercase conversion) will be performed for each file."
+    ),
+    verbose: int = Option(
+        0,
+        "--verbose",
+        "-v",
+        help="show log messages. -v shows INFO level logs, -vv shows DEBUG level",
+        count=True
     )
 ) -> None:
     "Analyzes a specified app and generates ConfigMap manifests for the app."
+
+    if verbose == 1:
+        _level = "INFO"
+    elif verbose >= 2:
+        _level = "DEBUG"
+    else:
+        _level = "WARNING"
+    basicConfig(level=_level, format="%(message)s",
+                datefmt="[%X]", handlers=[RichHandler()])
     main(app_name=app_name, in_dir=in_dir, out_dir=out_dir, stat_dir=stat_dir, take=take, file=file,
          use_debug_listener=use_debug_listener, preprocess=preprocess)
 
 
 if __name__ == '__main__':
-    # _level = "INFO"
-    _level = "DEBUG"
-    basicConfig(level=_level, format="%(message)s",
-                datefmt="[%X]", handlers=[RichHandler()])
     app()
