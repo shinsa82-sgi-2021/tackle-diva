@@ -88,7 +88,7 @@ def cli_main(
         "--out-dir", "-o",
         help="output directory of generated files"),
     lang: str = Option(
-        ...,
+        None,
         "--lang",
         "-l",
         help="Convert SQL files based on the dialect specified by this option. Currently only \"oracle\" is supported."

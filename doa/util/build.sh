@@ -8,8 +8,8 @@ set -eu  # abort on error or undefined variable reference
 WORK_DIR=$(readlink -f $(dirname $0)) # this script's directory
 . ${WORK_DIR}/common.sh
 
-# DOCKER_BUILD_OPT="--progress=plain"
-DOCKER_BUILD_OPT=""
+DOCKER_BUILD_OPT="--progress=plain"
+# DOCKER_BUILD_OPT=""
 
 # process optional arguments
 while getopts f OPT

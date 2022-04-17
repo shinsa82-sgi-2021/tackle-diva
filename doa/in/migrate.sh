@@ -1,6 +1,6 @@
 # main script. 
 set -e
-set -x # for debugging
+# set -x # for debugging
 
 APPNAME=$(basename $0)
 WORKDIR=$(readlink -f $(dirname $0)) # this script's directory

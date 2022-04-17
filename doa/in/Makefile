@@ -16,11 +16,11 @@ STAT_DIR=/tmp/stats
 
 # executing run-doa.sh with a debug flag
 run:
-	rm -rf ./_out
-	bash $(base_dir)/run-doa.sh -d -o ./_out -i start_up.sh $(SAMPLE_REPO_URL)
+	rm -rf $(OUT_DIR)
+	bash $(base_dir)/run-doa.sh -d -o $(OUT_DIR) -i start_up.sh $(SAMPLE_REPO_URL)
 	@echo
 	@echo "listing generated files..."
-	ls -lFR --color ./_out
+	ls -lFR --color $(OUT_DIR)
 
 # executing PL/SQL conversion sample
 run-plsql:
@@ -52,6 +52,10 @@ run-plsql-direct:
 # 	@echo
 # 	@echo "listing generated files..."
 # 	ls -lFR --color $(OUT_DIR)
+
+# Script to list created database. Execute after the test Pod is deployed.
+test-show-tables:
+	kubectl exec app-test -it -- psql -h app-db -U postgres -c "\dt"
 
 run-sqal-direct:
 	rm -rf $(OUT_DIR) $(STAT_DIR)

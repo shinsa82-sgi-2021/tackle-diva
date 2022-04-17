@@ -1,6 +1,6 @@
 # main script. 
 set -e
-set -x # for debugging
+# set -x # for debugging
 
 APPNAME=$(basename $0)
 WORKDIR=$(readlink -f $(dirname $0)) # this script's directory
@@ -57,7 +57,7 @@ OUTDIR=$(readlink -f ${outdir})
 # log
 echo
 cyan "------------------------"
-cyan "DiVA-DOA v2.2.0rc1"
+cyan "DiVA-DOA v2.2.0"
 cyan "------------------------"
 echo "this script = $(readlink -f $0)"
 echo "pwd = $(pwd)"
